@@ -12,8 +12,8 @@ using crypto.Models;
 namespace crypto.Migrations
 {
     [DbContext(typeof(CryptoDbContext))]
-    [Migration("20250421131846_Initial")]
-    partial class Initial
+    [Migration("20250422163158_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
