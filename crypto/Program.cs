@@ -10,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Szolgáltatások hozzáadása a konténerhez.
 
 // Adatbázis kontextus
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")?.Replace("Y4M52R", "Y4M52R"); // Cseréld le a saját Neptun kódodra, ha szükséges
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<CryptoDbContext>(options =>
     options.UseSqlServer(connectionString));
 
