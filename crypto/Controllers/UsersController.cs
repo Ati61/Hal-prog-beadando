@@ -1,6 +1,8 @@
 using crypto.Interfaces;
 using crypto.Models;
+using crypto.Dtos; 
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic; 
 
 namespace crypto.Controllers
 {
@@ -16,14 +18,14 @@ namespace crypto.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<User>>> GetAllUsers()
+        public async Task<ActionResult<IEnumerable<UserDto>>> GetAllUsers() 
         {
             var users = await _userService.GetAllUsersAsync();
             return Ok(users);
         }
 
         [HttpGet("{userId}")]
-        public async Task<ActionResult<User>> GetUserById(int userId)
+        public async Task<ActionResult<UserDto>> GetUserById(int userId) 
         {
             var user = await _userService.GetUserByIdAsync(userId);
             if (user == null)
@@ -34,11 +36,11 @@ namespace crypto.Controllers
         }
 
         [HttpPost("register")]
-        public async Task<ActionResult<User>> RegisterUser(User user)
+        public async Task<ActionResult<UserDto>> RegisterUser(UserRegisterDto userDto) 
         {
             try
             {
-                var registeredUser = await _userService.RegisterUserAsync(user);
+                var registeredUser = await _userService.RegisterUserAsync(userDto);
                 return CreatedAtAction(nameof(GetUserById), new { userId = registeredUser.Id }, registeredUser);
             }
             catch (InvalidOperationException ex)
@@ -48,14 +50,20 @@ namespace crypto.Controllers
         }
 
         [HttpPut("{userId}")]
-        public async Task<ActionResult<User>> UpdateUser(int userId, User user)
+        public async Task<ActionResult<UserDto>> UpdateUser(int userId, UserUpdateDto userDto)
         {
-            var updatedUser = await _userService.UpdateUserAsync(userId, user);
+             if (userId <= 0) 
+            {
+                return BadRequest("Invalid user ID.");
+            }
+
+
+            var updatedUser = await _userService.UpdateUserAsync(userId, userDto);
             if (updatedUser == null)
             {
                 return NotFound();
             }
-            return Ok(updatedUser);
+            return Ok(updatedUser); 
         }
 
         [HttpDelete("{userId}")]

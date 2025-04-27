@@ -1,6 +1,9 @@
 using crypto.Interfaces;
 using crypto.Models;
+using crypto.Dtos; 
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic; 
+using System.Linq; 
 
 namespace crypto.Services
 {
@@ -13,15 +16,34 @@ namespace crypto.Services
             _context = context;
         }
 
-        public async Task<Wallet?> GetWalletByUserIdAsync(int userId)
+        public async Task<WalletDto?> GetWalletByUserIdAsync(int userId)
         {
-            return await _context.Wallets
+            var wallet = await _context.Wallets
                 .Include(w => w.WalletCryptos)
                 .ThenInclude(wc => wc.Cryptocurrency)
                 .FirstOrDefaultAsync(w => w.UserId == userId);
+
+            if (wallet == null) return null;
+
+            return new WalletDto
+            {
+                Id = wallet.Id,
+                UserId = wallet.UserId,
+                Balance = wallet.Balance,
+                Cryptos = wallet.WalletCryptos.Select(wc => new WalletCryptoDto
+                {
+                    CryptocurrencyId = wc.CryptocurrencyId,
+                    Symbol = wc.Cryptocurrency.Symbol,
+                    Name = wc.Cryptocurrency.Name,
+                    Amount = wc.Amount,
+                    AverageAcquisitionPrice = wc.AverageAcquisitionPrice,
+                    CurrentPrice = wc.Cryptocurrency.CurrentPrice, 
+                    CurrentValue = wc.Amount * wc.Cryptocurrency.CurrentPrice 
+                }).ToList()
+            };
         }
 
-        public async Task<Wallet?> UpdateWalletBalanceAsync(int userId, decimal newBalance)
+        public async Task<WalletDto?> UpdateWalletBalanceAsync(int userId, decimal newBalance)
         {
             var wallet = await _context.Wallets.FirstOrDefaultAsync(w => w.UserId == userId);
             if (wallet == null)
@@ -31,7 +53,15 @@ namespace crypto.Services
 
             wallet.Balance = newBalance;
             await _context.SaveChangesAsync();
-            return wallet;
+
+     
+            return new WalletDto
+            {
+                Id = wallet.Id,
+                UserId = wallet.UserId,
+                Balance = wallet.Balance,
+                Cryptos = new List<WalletCryptoDto>() 
+            };
         }
 
         public async Task<bool> DeleteWalletAsync(int userId)
@@ -47,14 +77,25 @@ namespace crypto.Services
             return true;
         }
 
-        public async Task<IEnumerable<WalletCrypto>> GetUserCryptosAsync(int userId)
+        public async Task<IEnumerable<WalletCryptoDto>> GetUserCryptosAsync(int userId)
         {
             var wallet = await _context.Wallets
                 .Include(w => w.WalletCryptos)
                 .ThenInclude(wc => wc.Cryptocurrency)
                 .FirstOrDefaultAsync(w => w.UserId == userId);
 
-            return wallet?.WalletCryptos ?? new List<WalletCrypto>();
+            if (wallet == null) return new List<WalletCryptoDto>(); 
+
+            return wallet.WalletCryptos.Select(wc => new WalletCryptoDto
+            {
+                CryptocurrencyId = wc.CryptocurrencyId,
+                Symbol = wc.Cryptocurrency.Symbol,
+                Name = wc.Cryptocurrency.Name,
+                Amount = wc.Amount,
+                AverageAcquisitionPrice = wc.AverageAcquisitionPrice,
+                CurrentPrice = wc.Cryptocurrency.CurrentPrice,
+                CurrentValue = wc.Amount * wc.Cryptocurrency.CurrentPrice
+            }).ToList();
         }
     }
 }

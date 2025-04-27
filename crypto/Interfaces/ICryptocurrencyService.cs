@@ -1,15 +1,18 @@
 using crypto.Models;
+using crypto.Dtos; 
+using System.Collections.Generic; 
 
 namespace crypto.Interfaces
 {
     public interface ICryptocurrencyService
     {
-        Task<IEnumerable<Cryptocurrency>> GetAllCryptocurrenciesAsync();
-        Task<Cryptocurrency?> GetCryptocurrencyByIdAsync(int id);
-        Task<Cryptocurrency> AddCryptocurrencyAsync(Cryptocurrency cryptocurrency);
+        Task<IEnumerable<CryptocurrencyDto>> GetAllCryptocurrenciesAsync(); 
+        Task<CryptocurrencyDto?> GetCryptocurrencyByIdAsync(int id);
+        Task<CryptocurrencyDto> AddCryptocurrencyAsync(CryptocurrencyCreateDto cryptocurrencyDto);
         Task<bool> DeleteCryptocurrencyAsync(int id);
-        Task<Cryptocurrency?> UpdateCryptoPriceAsync(int id, decimal newPrice);
-        Task<IEnumerable<PriceHistory>> GetPriceHistoryAsync(int cryptoId);
+        Task<CryptocurrencyDto?> UpdateCryptoPriceAsync(int id, decimal newPrice); 
+        Task<IEnumerable<PriceHistoryDto>> GetPriceHistoryAsync(int cryptoId); 
         Task SeedInitialCryptocurrenciesAsync();
+        Task UpdateAllPricesRandomlyAsync();
     }
 }

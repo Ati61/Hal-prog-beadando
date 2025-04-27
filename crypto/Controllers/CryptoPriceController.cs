@@ -1,6 +1,8 @@
 using crypto.Interfaces;
 using crypto.Models;
+using crypto.Dtos;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
 
 namespace crypto.Controllers
 {
@@ -16,8 +18,14 @@ namespace crypto.Controllers
         }
 
         [HttpPut("price")]
-        public async Task<ActionResult<Cryptocurrency>> UpdateCryptoPrice([FromBody] PriceUpdateRequest request)
+        public async Task<ActionResult<CryptocurrencyDto>> UpdateCryptoPrice([FromBody] PriceUpdateDto request)
         {
+            
+            if (request.CryptoId <= 0 || request.NewPrice < 0) //nem lehet negativ 
+            {
+                return BadRequest("Invalid price update request.");
+            }
+
             var crypto = await _cryptoService.UpdateCryptoPriceAsync(request.CryptoId, request.NewPrice);
             if (crypto == null)
             {
@@ -27,16 +35,14 @@ namespace crypto.Controllers
         }
 
         [HttpGet("price/history/{cryptoId}")]
-        public async Task<ActionResult<IEnumerable<PriceHistory>>> GetPriceHistory(int cryptoId)
+        public async Task<ActionResult<IEnumerable<PriceHistoryDto>>> GetPriceHistory(int cryptoId)
         {
+            if (cryptoId <= 0)
+            {
+                return BadRequest("Invalid cryptocurrency ID.");
+            }
             var history = await _cryptoService.GetPriceHistoryAsync(cryptoId);
             return Ok(history);
         }
-    }
-
-    public class PriceUpdateRequest
-    {
-        public int CryptoId { get; set; }
-        public decimal NewPrice { get; set; }
     }
 }

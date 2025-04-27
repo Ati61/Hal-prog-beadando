@@ -1,6 +1,8 @@
 using crypto.Interfaces;
 using crypto.Models;
+using crypto.Dtos;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
 
 namespace crypto.Controllers
 {
@@ -16,15 +18,23 @@ namespace crypto.Controllers
         }
 
         [HttpGet("transactions/{userId}")]
-        public async Task<ActionResult<IEnumerable<Transaction>>> GetUserTransactions(int userId)
+        public async Task<ActionResult<IEnumerable<TransactionDto>>> GetUserTransactions(int userId) // Return DTO list
         {
+            if (userId <= 0)
+            {
+                return BadRequest("Invalid user ID.");
+            }
             var transactions = await _tradeService.GetUserTransactionsAsync(userId);
             return Ok(transactions);
         }
 
         [HttpGet("transactions/details/{transactionId}")]
-        public async Task<ActionResult<Transaction>> GetTransactionDetails(int transactionId)
+        public async Task<ActionResult<TransactionDto>> GetTransactionDetails(int transactionId) // Return DTO
         {
+             if (transactionId <= 0)
+            {
+                return BadRequest("Invalid transaction ID.");
+            }
             var transaction = await _tradeService.GetTransactionDetailsAsync(transactionId);
             if (transaction == null)
             {
@@ -34,15 +44,23 @@ namespace crypto.Controllers
         }
 
         [HttpGet("profit/{userId}")]
-        public async Task<ActionResult> CalculateProfit(int userId)
+        public async Task<ActionResult<TotalProfitDto>> CalculateProfit(int userId)
         {
+             if (userId <= 0)
+            {
+                return BadRequest("Invalid user ID.");
+            }
             var profit = await _tradeService.CalculateUserProfitAsync(userId);
             return Ok(profit);
         }
 
         [HttpGet("profit/details/{userId}")]
-        public async Task<ActionResult> GetDetailedProfit(int userId)
+        public async Task<ActionResult<DetailedProfitDto>> GetDetailedProfit(int userId) 
         {
+             if (userId <= 0)
+            {
+                return BadRequest("Invalid user ID.");
+            }
             var detailedProfit = await _tradeService.GetDetailedProfitAsync(userId);
             return Ok(detailedProfit);
         }

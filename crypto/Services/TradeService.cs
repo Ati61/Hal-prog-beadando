@@ -1,6 +1,9 @@
 using crypto.Interfaces;
 using crypto.Models;
+using crypto.Dtos;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic; 
+using System.Linq; 
 
 namespace crypto.Services
 {
@@ -13,42 +16,36 @@ namespace crypto.Services
             _context = context;
         }
 
-        public async Task<Transaction?> BuyCryptoAsync(int userId, int cryptoId, decimal amount)
+        public async Task<TransactionDto?> BuyCryptoAsync(int userId, int cryptoId, decimal amount) 
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            using var dbTransaction = await _context.Database.BeginTransactionAsync(); 
             try
             {
                 var user = await _context.Users.Include(u => u.Wallet).FirstOrDefaultAsync(u => u.Id == userId);
-                if (user == null)
+                if (user == null || user.Wallet == null) 
                 {
-                    return null;
+                    return null; 
                 }
 
                 var crypto = await _context.Cryptocurrencies.FindAsync(cryptoId);
                 if (crypto == null)
                 {
-                    return null;
+                    return null; 
                 }
 
-                // Calculate total cost
                 decimal totalCost = amount * crypto.CurrentPrice;
-
-                // Check if user has enough balance
                 if (user.Wallet.Balance < totalCost)
                 {
                     throw new InvalidOperationException("Insufficient funds");
                 }
 
-                // Update wallet balance
                 user.Wallet.Balance -= totalCost;
 
-                // Check if user already owns this crypto
                 var walletCrypto = await _context.WalletCryptos
                     .FirstOrDefaultAsync(wc => wc.WalletId == user.Wallet.Id && wc.CryptocurrencyId == cryptoId);
 
                 if (walletCrypto == null)
                 {
-                    // User doesn't own this crypto yet, create new wallet crypto
                     walletCrypto = new WalletCrypto
                     {
                         WalletId = user.Wallet.Id,
@@ -60,13 +57,13 @@ namespace crypto.Services
                 }
                 else
                 {
-                    // User already owns this crypto, update amount and average acquisition price
-                    decimal totalValue = (walletCrypto.Amount * walletCrypto.AverageAcquisitionPrice) + totalCost;
+                    decimal existingValue = walletCrypto.Amount * walletCrypto.AverageAcquisitionPrice;
+                    decimal newValue = totalCost;
                     walletCrypto.Amount += amount;
-                    walletCrypto.AverageAcquisitionPrice = totalValue / walletCrypto.Amount;
+                    //0val nem osztunk 
+                    walletCrypto.AverageAcquisitionPrice = walletCrypto.Amount > 0 ? (existingValue + newValue) / walletCrypto.Amount : 0;
                 }
 
-                // Create transaction record
                 var trx = new Transaction
                 {
                     UserId = userId,
@@ -80,24 +77,35 @@ namespace crypto.Services
                 _context.Transactions.Add(trx);
 
                 await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                await dbTransaction.CommitAsync();
 
-                return trx;
+                return new TransactionDto
+                {
+                    Id = trx.Id,
+                    UserId = trx.UserId,
+                    CryptocurrencyId = trx.CryptocurrencyId,
+                    CryptocurrencySymbol = crypto.Symbol,
+                    Type = trx.Type,
+                    Amount = trx.Amount,
+                    Price = trx.Price,
+                    TotalValue = trx.TotalValue,
+                    Timestamp = trx.Timestamp
+                };
             }
             catch
             {
-                await transaction.RollbackAsync();
+                await dbTransaction.RollbackAsync();
                 throw;
             }
         }
 
-        public async Task<Transaction?> SellCryptoAsync(int userId, int cryptoId, decimal amount)
+        public async Task<TransactionDto?> SellCryptoAsync(int userId, int cryptoId, decimal amount)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            using var dbTransaction = await _context.Database.BeginTransactionAsync(); 
             try
             {
                 var user = await _context.Users.Include(u => u.Wallet).FirstOrDefaultAsync(u => u.Id == userId);
-                if (user == null)
+                if (user == null || user.Wallet == null)
                 {
                     return null;
                 }
@@ -108,7 +116,6 @@ namespace crypto.Services
                     return null;
                 }
 
-                // Check if user owns this crypto
                 var walletCrypto = await _context.WalletCryptos
                     .FirstOrDefaultAsync(wc => wc.WalletId == user.Wallet.Id && wc.CryptocurrencyId == cryptoId);
 
@@ -117,21 +124,16 @@ namespace crypto.Services
                     throw new InvalidOperationException("Insufficient crypto balance");
                 }
 
-                // Calculate total value
                 decimal totalValue = amount * crypto.CurrentPrice;
-
-                // Update wallet balance
                 user.Wallet.Balance += totalValue;
-
-                // Update wallet crypto
                 walletCrypto.Amount -= amount;
+
                 if (walletCrypto.Amount <= 0)
                 {
-                    // If no more crypto left, remove the wallet crypto entry
                     _context.WalletCryptos.Remove(walletCrypto);
                 }
+                // Note: AverageAcquisitionPrice nem valtozunk eladáskor
 
-                // Create transaction record
                 var trx = new Transaction
                 {
                     UserId = userId,
@@ -145,38 +147,77 @@ namespace crypto.Services
                 _context.Transactions.Add(trx);
 
                 await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                await dbTransaction.CommitAsync();
 
-                return trx;
+
+                return new TransactionDto
+                {
+                    Id = trx.Id,
+                    UserId = trx.UserId,
+                    CryptocurrencyId = trx.CryptocurrencyId,
+                    CryptocurrencySymbol = crypto.Symbol, 
+                    Type = trx.Type,
+                    Amount = trx.Amount,
+                    Price = trx.Price,
+                    TotalValue = trx.TotalValue,
+                    Timestamp = trx.Timestamp
+                };
             }
             catch
             {
-                await transaction.RollbackAsync();
+                await dbTransaction.RollbackAsync();
                 throw;
             }
         }
 
-        public async Task<IEnumerable<Transaction>> GetUserTransactionsAsync(int userId)
+        public async Task<IEnumerable<TransactionDto>> GetUserTransactionsAsync(int userId) 
         {
             return await _context.Transactions
-                .Include(t => t.Cryptocurrency)
+                .Include(t => t.Cryptocurrency) 
                 .Where(t => t.UserId == userId)
                 .OrderByDescending(t => t.Timestamp)
+                .Select(trx => new TransactionDto
+                {
+                    Id = trx.Id,
+                    UserId = trx.UserId,
+                    CryptocurrencyId = trx.CryptocurrencyId,
+                    CryptocurrencySymbol = trx.Cryptocurrency.Symbol,
+                    Type = trx.Type,
+                    Amount = trx.Amount,
+                    Price = trx.Price,
+                    TotalValue = trx.TotalValue,
+                    Timestamp = trx.Timestamp
+                })
                 .ToListAsync();
         }
 
-        public async Task<Transaction?> GetTransactionDetailsAsync(int transactionId)
+        public async Task<TransactionDto?> GetTransactionDetailsAsync(int transactionId) 
         {
-            return await _context.Transactions
+            var trx = await _context.Transactions
                 .Include(t => t.Cryptocurrency)
-                .Include(t => t.User)
+                .Include(t => t.User) 
                 .FirstOrDefaultAsync(t => t.Id == transactionId);
+
+            if (trx == null) return null;
+
+            return new TransactionDto
+            {
+                Id = trx.Id,
+                UserId = trx.UserId,
+                CryptocurrencyId = trx.CryptocurrencyId,
+                CryptocurrencySymbol = trx.Cryptocurrency.Symbol,
+                Type = trx.Type,
+                Amount = trx.Amount,
+                Price = trx.Price,
+                TotalValue = trx.TotalValue,
+                Timestamp = trx.Timestamp
+            };
         }
 
-        public async Task<dynamic> CalculateUserProfitAsync(int userId)
+        public async Task<TotalProfitDto> CalculateUserProfitAsync(int userId) 
         {
             decimal totalProfit = 0;
-            
+
             var walletCryptos = await _context.WalletCryptos
                 .Include(wc => wc.Cryptocurrency)
                 .Where(wc => wc.Wallet.UserId == userId)
@@ -190,17 +231,17 @@ namespace crypto.Services
                 totalProfit += profit;
             }
 
-            return new { TotalProfit = totalProfit };
+            return new TotalProfitDto { TotalProfit = totalProfit };
         }
 
-        public async Task<dynamic> GetDetailedProfitAsync(int userId)
+        public async Task<DetailedProfitDto> GetDetailedProfitAsync(int userId) 
         {
             var walletCryptos = await _context.WalletCryptos
                 .Include(wc => wc.Cryptocurrency)
                 .Where(wc => wc.Wallet.UserId == userId)
                 .ToListAsync();
 
-            var result = new List<object>();
+            var result = new List<CryptoProfitDetailDto>();
             decimal totalProfit = 0;
 
             foreach (var walletCrypto in walletCryptos)
@@ -210,7 +251,7 @@ namespace crypto.Services
                 decimal profit = currentValue - acquisitionValue;
                 totalProfit += profit;
 
-                result.Add(new
+                result.Add(new CryptoProfitDetailDto 
                 {
                     CryptocurrencyId = walletCrypto.CryptocurrencyId,
                     Symbol = walletCrypto.Cryptocurrency.Symbol,
@@ -225,7 +266,7 @@ namespace crypto.Services
                 });
             }
 
-            return new
+            return new DetailedProfitDto 
             {
                 DetailedProfits = result,
                 TotalProfit = totalProfit

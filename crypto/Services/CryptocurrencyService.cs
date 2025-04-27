@@ -1,6 +1,9 @@
 using crypto.Interfaces;
 using crypto.Models;
+using crypto.Dtos;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic; 
+using System.Linq; 
 
 namespace crypto.Services
 {
@@ -14,22 +17,38 @@ namespace crypto.Services
             _context = context;
         }
 
-        public async Task<IEnumerable<Cryptocurrency>> GetAllCryptocurrenciesAsync()
+        public async Task<IEnumerable<CryptocurrencyDto>> GetAllCryptocurrenciesAsync() 
         {
-            return await _context.Cryptocurrencies.ToListAsync();
+            return await _context.Cryptocurrencies
+                .Select(c => new CryptocurrencyDto { Id = c.Id, Symbol = c.Symbol, Name = c.Name, CurrentPrice = c.CurrentPrice })
+                .ToListAsync();
         }
 
-        public async Task<Cryptocurrency?> GetCryptocurrencyByIdAsync(int id)
+        public async Task<CryptocurrencyDto?> GetCryptocurrencyByIdAsync(int id) 
         {
-            return await _context.Cryptocurrencies.FindAsync(id);
+            var crypto = await _context.Cryptocurrencies.FindAsync(id);
+            if (crypto == null) return null;
+            return new CryptocurrencyDto { Id = crypto.Id, Symbol = crypto.Symbol, Name = crypto.Name, CurrentPrice = crypto.CurrentPrice };
         }
 
-        public async Task<Cryptocurrency> AddCryptocurrencyAsync(Cryptocurrency cryptocurrency)
+        public async Task<CryptocurrencyDto> AddCryptocurrencyAsync(CryptocurrencyCreateDto cryptoDto) 
         {
+            if (await _context.Cryptocurrencies.AnyAsync(c => c.Symbol == cryptoDto.Symbol))
+            {
+                throw new InvalidOperationException("Cryptocurrency with this symbol already exists.");
+            }
+
+            var cryptocurrency = new Cryptocurrency
+            {
+                Symbol = cryptoDto.Symbol,
+                Name = cryptoDto.Name,
+                CurrentPrice = cryptoDto.CurrentPrice
+            };
+
             _context.Cryptocurrencies.Add(cryptocurrency);
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(); 
 
-            // Record the initial price in the history
+            // Kezdeti ár rögzítése az előzményekbe
             var priceHistory = new PriceHistory
             {
                 CryptocurrencyId = cryptocurrency.Id,
@@ -39,7 +58,7 @@ namespace crypto.Services
             _context.PriceHistory.Add(priceHistory);
             await _context.SaveChangesAsync();
 
-            return cryptocurrency;
+            return new CryptocurrencyDto { Id = cryptocurrency.Id, Symbol = cryptocurrency.Symbol, Name = cryptocurrency.Name, CurrentPrice = cryptocurrency.CurrentPrice };
         }
 
         public async Task<bool> DeleteCryptocurrencyAsync(int id)
@@ -55,7 +74,7 @@ namespace crypto.Services
             return true;
         }
 
-        public async Task<Cryptocurrency?> UpdateCryptoPriceAsync(int id, decimal newPrice)
+        public async Task<CryptocurrencyDto?> UpdateCryptoPriceAsync(int id, decimal newPrice)
         {
             var crypto = await _context.Cryptocurrencies.FindAsync(id);
             if (crypto == null)
@@ -65,7 +84,6 @@ namespace crypto.Services
 
             crypto.CurrentPrice = newPrice;
 
-            // Add to price history
             var priceHistory = new PriceHistory
             {
                 CryptocurrencyId = id,
@@ -75,20 +93,20 @@ namespace crypto.Services
             _context.PriceHistory.Add(priceHistory);
 
             await _context.SaveChangesAsync();
-            return crypto;
+            return new CryptocurrencyDto { Id = crypto.Id, Symbol = crypto.Symbol, Name = crypto.Name, CurrentPrice = crypto.CurrentPrice };
         }
 
-        public async Task<IEnumerable<PriceHistory>> GetPriceHistoryAsync(int cryptoId)
+        public async Task<IEnumerable<PriceHistoryDto>> GetPriceHistoryAsync(int cryptoId) // Return DTO
         {
             return await _context.PriceHistory
                 .Where(ph => ph.CryptocurrencyId == cryptoId)
                 .OrderByDescending(ph => ph.Timestamp)
+                .Select(ph => new PriceHistoryDto { Id = ph.Id, CryptocurrencyId = ph.CryptocurrencyId, Price = ph.Price, Timestamp = ph.Timestamp })
                 .ToListAsync();
         }
 
         public async Task SeedInitialCryptocurrenciesAsync()
         {
-            // Only seed if no cryptocurrencies exist
             if (await _context.Cryptocurrencies.AnyAsync())
             {
                 return;
@@ -119,7 +137,7 @@ namespace crypto.Services
             }
             await _context.SaveChangesAsync();
 
-            // Add initial price history for each cryptocurrency
+            // Kezdeti árfolyam-előzmények hozzáadása minden kriptovalutához
             var now = DateTime.UtcNow;
             foreach (var crypto in cryptocurrencies)
             {
@@ -140,14 +158,14 @@ namespace crypto.Services
 
             foreach (var crypto in cryptos)
             {
-                // Generate a random percentage change between -5% and +5%
+                // Véletlenszerű százalékos változás generálása -5% és +5% között
                 var percentageChange = (_random.NextDouble() * 10) - 5;
                 var priceChange = crypto.CurrentPrice * (decimal)(percentageChange / 100);
                 var newPrice = Math.Max(0.00000001m, crypto.CurrentPrice + priceChange);
                 
                 crypto.CurrentPrice = newPrice;
 
-                // Add to price history
+                // Hozzáadás az árfolyam-előzményekhez
                 _context.PriceHistory.Add(new PriceHistory
                 {
                     CryptocurrencyId = crypto.Id,

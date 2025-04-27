@@ -1,13 +1,15 @@
 using crypto.Models;
+using crypto.Dtos;
+using System.Collections.Generic;
 
 namespace crypto.Interfaces
 {
     public interface IUserService
     {
-        Task<IEnumerable<User>> GetAllUsersAsync();
-        Task<User?> GetUserByIdAsync(int id);
-        Task<User> RegisterUserAsync(User user);
-        Task<User?> UpdateUserAsync(int id, User user);
+        Task<IEnumerable<UserDto>> GetAllUsersAsync(); 
+        Task<UserDto?> GetUserByIdAsync(int id);
+        Task<UserDto> RegisterUserAsync(UserRegisterDto userDto); 
+        Task<UserDto?> UpdateUserAsync(int id, UserUpdateDto userDto); 
         Task<bool> DeleteUserAsync(int id);
     }
 }

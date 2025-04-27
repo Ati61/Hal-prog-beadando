@@ -1,6 +1,8 @@
 using crypto.Interfaces;
 using crypto.Models;
+using crypto.Dtos; 
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic; 
 
 namespace crypto.Controllers
 {
@@ -16,7 +18,7 @@ namespace crypto.Controllers
         }
 
         [HttpGet("{userId}")]
-        public async Task<ActionResult<Wallet>> GetWallet(int userId)
+        public async Task<ActionResult<WalletDto>> GetWallet(int userId) 
         {
             var wallet = await _walletService.GetWalletByUserIdAsync(userId);
             if (wallet == null)
@@ -27,14 +29,23 @@ namespace crypto.Controllers
         }
 
         [HttpPut("{userId}")]
-        public async Task<ActionResult<Wallet>> UpdateWalletBalance(int userId, [FromBody] decimal newBalance)
+        public async Task<ActionResult<WalletDto>> UpdateWalletBalance(int userId, [FromBody] UpdateBalanceDto updateDto)
         {
-            var wallet = await _walletService.UpdateWalletBalanceAsync(userId, newBalance);
+            if (userId <= 0)
+            {
+                return BadRequest("Invalid user ID.");
+            }
+            if (updateDto.NewBalance < 0)
+            {
+                return BadRequest("Balance cannot be negative.");
+            }
+
+            var wallet = await _walletService.UpdateWalletBalanceAsync(userId, updateDto.NewBalance);
             if (wallet == null)
             {
                 return NotFound();
             }
-            return Ok(wallet);
+            return Ok(wallet); 
         }
 
         [HttpDelete("{userId}")]

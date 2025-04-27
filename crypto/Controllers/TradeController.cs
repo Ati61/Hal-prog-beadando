@@ -1,5 +1,6 @@
 using crypto.Interfaces;
 using crypto.Models;
+using crypto.Dtos;
 using Microsoft.AspNetCore.Mvc;
 
 namespace crypto.Controllers
@@ -16,16 +17,22 @@ namespace crypto.Controllers
         }
 
         [HttpPost("buy")]
-        public async Task<ActionResult<Transaction>> BuyCrypto([FromBody] TradeRequest request)
+        public async Task<ActionResult<TransactionDto>> BuyCrypto([FromBody] TradeRequestDto request) 
         {
+            // Add basic validation
+            if (request.UserId <= 0 || request.CryptoId <= 0 || request.Amount <= 0)
+            {
+                return BadRequest("Invalid trade request data.");
+            }
+
             try
             {
                 var transaction = await _tradeService.BuyCryptoAsync(request.UserId, request.CryptoId, request.Amount);
                 if (transaction == null)
                 {
-                    return NotFound("User or cryptocurrency not found");
+                    return NotFound("User or cryptocurrency not found, or other issue occurred.");
                 }
-                return Ok(transaction);
+                return Ok(transaction); 
             }
             catch (InvalidOperationException ex)
             {
@@ -34,28 +41,26 @@ namespace crypto.Controllers
         }
 
         [HttpPost("sell")]
-        public async Task<ActionResult<Transaction>> SellCrypto([FromBody] TradeRequest request)
+        public async Task<ActionResult<TransactionDto>> SellCrypto([FromBody] TradeRequestDto request) 
         {
+            if (request.UserId <= 0 || request.CryptoId <= 0 || request.Amount <= 0)
+            {
+                return BadRequest("Invalid trade request data.");
+            }
+
             try
             {
                 var transaction = await _tradeService.SellCryptoAsync(request.UserId, request.CryptoId, request.Amount);
                 if (transaction == null)
                 {
-                    return NotFound("User or cryptocurrency not found");
+                    return NotFound("User or cryptocurrency not found, or other issue occurred.");
                 }
-                return Ok(transaction);
+                return Ok(transaction); 
             }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(ex.Message);
             }
         }
-    }
-
-    public class TradeRequest
-    {
-        public int UserId { get; set; }
-        public int CryptoId { get; set; }
-        public decimal Amount { get; set; }
     }
 }

@@ -1,6 +1,8 @@
 using crypto.Interfaces;
 using crypto.Models;
+using crypto.Dtos; 
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic; 
 
 namespace crypto.Controllers
 {
@@ -16,14 +18,14 @@ namespace crypto.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Cryptocurrency>>> GetAllCryptocurrencies()
+        public async Task<ActionResult<IEnumerable<CryptocurrencyDto>>> GetAllCryptocurrencies()
         {
             var cryptos = await _cryptoService.GetAllCryptocurrenciesAsync();
             return Ok(cryptos);
         }
 
         [HttpGet("{cryptoId}")]
-        public async Task<ActionResult<Cryptocurrency>> GetCryptocurrencyById(int cryptoId)
+        public async Task<ActionResult<CryptocurrencyDto>> GetCryptocurrencyById(int cryptoId) 
         {
             var crypto = await _cryptoService.GetCryptocurrencyByIdAsync(cryptoId);
             if (crypto == null)
@@ -34,10 +36,17 @@ namespace crypto.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Cryptocurrency>> AddCryptocurrency(Cryptocurrency cryptocurrency)
+        public async Task<ActionResult<CryptocurrencyDto>> AddCryptocurrency(CryptocurrencyCreateDto cryptocurrencyDto) 
         {
-            var addedCrypto = await _cryptoService.AddCryptocurrencyAsync(cryptocurrency);
-            return CreatedAtAction(nameof(GetCryptocurrencyById), new { cryptoId = addedCrypto.Id }, addedCrypto);
+            try
+            {
+                var addedCrypto = await _cryptoService.AddCryptocurrencyAsync(cryptocurrencyDto);
+                return CreatedAtAction(nameof(GetCryptocurrencyById), new { cryptoId = addedCrypto.Id }, addedCrypto);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpDelete("{cryptoId}")]
